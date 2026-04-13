@@ -1,0 +1,37 @@
+uploads = []
+
+[[generated]]
+id = "v_G1lvKbf0NDhcb_934_x"
+uri = "file://artifacts/demo-video/public/images/ai-brain.png"
+type = "image"
+title = "Abstract AI brain network"
+
+[[generated]]
+id = "D7P3Dls97Cwgw4hveYbxp"
+uri = "file://artifacts/demo-video/public/images/triangle-nodes.png"
+type = "image"
+title = "Abstract 3D connecting triangle"
+
+[[generated]]
+id = "Wzeu9vofteL1HUsr-C_1h"
+uri = "file://artifacts/demo-video/public/images/gemini-spark.png"
+type = "image"
+title = "Google Cloud Gemini spark"
+
+[[outputs]]
+id = "o8_U7kAlTwYvuhOJeRlXh"
+uri = "file://screenshots/swagger-ui.jpg"
+type = "image"
+title = "API Demo Screenshot — Swagger UI"
+
+[[outputs]]
+id = "E83sKasFQFPcnGPSmCD51"
+uri = "file://screenshots/swagger-orchestrator.jpg"
+type = "image"
+title = "API Demo Screenshot — Orchestrator & Scheduling"
+
+[[outputs]]
+id = "5_W9HExxEnmDR9ZqGf_QK"
+uri = "file://screenshots/demo-video-scene1.jpg"
+type = "image"
+title = "Demo Video — Opening Frame"
