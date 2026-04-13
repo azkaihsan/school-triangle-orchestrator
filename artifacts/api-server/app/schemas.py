@@ -138,6 +138,12 @@ class OrchestrateRequest(BaseModel):
     topic: str | None = None
 
 
+class AgentStatus(BaseModel):
+    agent: str
+    status: str
+    error: str | None = None
+
+
 class OrchestrateResponse(BaseModel):
     orchestration_id: int
     student_id: int
@@ -145,6 +151,7 @@ class OrchestrateResponse(BaseModel):
     topic: str | None
     status: str
     execution_time_ms: int
+    agent_statuses: list[AgentStatus]
     student_insight: dict
     teacher_action: dict
     parent_communication: dict

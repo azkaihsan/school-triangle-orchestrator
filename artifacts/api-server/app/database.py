@@ -1,5 +1,4 @@
 import os
-import ssl
 from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
@@ -21,10 +20,7 @@ def _get_async_url() -> tuple[str, dict]:
     sslmode = params.pop("sslmode", None)
     connect_args: dict = {}
     if sslmode and sslmode not in ("disable", "allow", "prefer"):
-        ssl_ctx = ssl.create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = ssl.CERT_NONE
-        connect_args["ssl"] = ssl_ctx
+        connect_args["ssl"] = True
 
     new_query = urlencode(params)
     clean_url = urlunparse(parsed._replace(query=new_query))

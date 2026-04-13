@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import Student, OrchestrationLog, Intervention, Assignment, ParentNotification
-from ..schemas import OrchestrateRequest, OrchestrateResponse, OrchestrationLogOut
+from ..schemas import OrchestrateRequest, OrchestrateResponse, OrchestrationLogOut, AgentStatus
 from ..agents.student_insight import run_student_insight_agent
 from ..agents.teacher_action import run_teacher_action_agent
 from ..agents.parent_communication import run_parent_communication_agent
@@ -35,47 +35,81 @@ async def orchestrate(body: OrchestrateRequest, db: AsyncSession = Depends(get_d
 
     logger.info(f"Orchestration started for student_id={body.student_id}, trigger='{body.trigger_description}'")
 
-    student_insight = await run_student_insight_agent(
-        student_name=student.name,
-        grade_level=student.grade_level,
-        learning_style=student.learning_style,
-        trigger_description=body.trigger_description,
-        topic=body.topic,
-    )
-    logger.info(f"Student Insight Agent complete for student_id={body.student_id}")
+    agent_statuses: list[AgentStatus] = []
+    student_insight: dict = {}
+    teacher_action: dict = {}
+    parent_communication: dict = {}
+    scheduling: dict = {}
 
-    teacher_action = await run_teacher_action_agent(
-        student_name=student.name,
-        grade_level=student.grade_level,
-        trigger_description=body.trigger_description,
-        topic=body.topic,
-        student_insight=student_insight,
-    )
-    logger.info(f"Teacher Action Agent complete for student_id={body.student_id}")
+    try:
+        student_insight = await run_student_insight_agent(
+            student_name=student.name,
+            grade_level=student.grade_level,
+            learning_style=student.learning_style,
+            trigger_description=body.trigger_description,
+            topic=body.topic,
+        )
+        agent_statuses.append(AgentStatus(agent="student_insight", status="success"))
+        logger.info(f"Student Insight Agent complete for student_id={body.student_id}")
+    except Exception as exc:
+        agent_statuses.append(AgentStatus(agent="student_insight", status="failed", error=str(exc)))
+        logger.error(f"Student Insight Agent failed for student_id={body.student_id}: {exc}")
 
-    parent_communication = await run_parent_communication_agent(
-        student_name=student.name,
-        grade_level=student.grade_level,
-        parent_name=parent_name,
-        trigger_description=body.trigger_description,
-        topic=body.topic,
-        student_insight=student_insight,
-        teacher_action=teacher_action,
-    )
-    logger.info(f"Parent Communication Agent complete for student_id={body.student_id}")
+    try:
+        teacher_action = await run_teacher_action_agent(
+            student_name=student.name,
+            grade_level=student.grade_level,
+            trigger_description=body.trigger_description,
+            topic=body.topic,
+            student_insight=student_insight,
+        )
+        agent_statuses.append(AgentStatus(agent="teacher_action", status="success"))
+        logger.info(f"Teacher Action Agent complete for student_id={body.student_id}")
+    except Exception as exc:
+        agent_statuses.append(AgentStatus(agent="teacher_action", status="failed", error=str(exc)))
+        logger.error(f"Teacher Action Agent failed for student_id={body.student_id}: {exc}")
 
-    scheduling = await run_scheduling_agent(
-        student_name=student.name,
-        teacher_name=teacher_name,
-        parent_name=parent_name,
-        trigger_description=body.trigger_description,
-        topic=body.topic,
-        teacher_action=teacher_action,
-        parent_communication=parent_communication,
-    )
-    logger.info(f"Scheduling Agent complete for student_id={body.student_id}")
+    try:
+        parent_communication = await run_parent_communication_agent(
+            student_name=student.name,
+            grade_level=student.grade_level,
+            parent_name=parent_name,
+            trigger_description=body.trigger_description,
+            topic=body.topic,
+            student_insight=student_insight,
+            teacher_action=teacher_action,
+        )
+        agent_statuses.append(AgentStatus(agent="parent_communication", status="success"))
+        logger.info(f"Parent Communication Agent complete for student_id={body.student_id}")
+    except Exception as exc:
+        agent_statuses.append(AgentStatus(agent="parent_communication", status="failed", error=str(exc)))
+        logger.error(f"Parent Communication Agent failed for student_id={body.student_id}: {exc}")
+
+    try:
+        scheduling = await run_scheduling_agent(
+            student_name=student.name,
+            teacher_name=teacher_name,
+            parent_name=parent_name,
+            trigger_description=body.trigger_description,
+            topic=body.topic,
+            teacher_action=teacher_action,
+            parent_communication=parent_communication,
+        )
+        agent_statuses.append(AgentStatus(agent="scheduling", status="success"))
+        logger.info(f"Scheduling Agent complete for student_id={body.student_id}")
+    except Exception as exc:
+        agent_statuses.append(AgentStatus(agent="scheduling", status="failed", error=str(exc)))
+        logger.error(f"Scheduling Agent failed for student_id={body.student_id}: {exc}")
 
     execution_time_ms = int(time.time() * 1000) - start_ms
+
+    failed = [s for s in agent_statuses if s.status == "failed"]
+    if len(failed) == 0:
+        overall_status = "success"
+    elif len(failed) == len(agent_statuses):
+        overall_status = "failed"
+    else:
+        overall_status = "partial"
 
     plan = teacher_action.get("intervention_plan", {})
     if plan:
@@ -116,9 +150,9 @@ async def orchestrate(body: OrchestrateRequest, db: AsyncSession = Depends(get_d
     mastery = student_insight.get("mastery_level", "unknown")
     priority = teacher_action.get("priority", "medium")
     summary = (
-        f"Orchestration complete for {student.name} (Grade {student.grade_level}). "
+        f"Orchestration {overall_status} for {student.name} (Grade {student.grade_level}). "
         f"Mastery level: {mastery}. Intervention priority: {priority}. "
-        f"Teacher action plan generated. Parent communication prepared. "
+        f"{len([s for s in agent_statuses if s.status == 'success'])}/{len(agent_statuses)} agents succeeded. "
         f"{len(scheduling.get('calendar_events', []))} calendar event(s) scheduled. "
         f"Execution time: {execution_time_ms}ms."
     )
@@ -128,6 +162,7 @@ async def orchestrate(body: OrchestrateRequest, db: AsyncSession = Depends(get_d
         "student_name": student.name,
         "mastery_level": mastery,
         "intervention_priority": priority,
+        "agent_statuses": [s.model_dump() for s in agent_statuses],
         "actions_taken": {
             "interventions_created": 1 if plan else 0,
             "assignments_created": len(teacher_action.get("assignments", [])),
@@ -147,21 +182,22 @@ async def orchestrate(body: OrchestrateRequest, db: AsyncSession = Depends(get_d
         parent_communication_result=parent_communication,
         scheduling_result=scheduling,
         unified_response=unified,
-        status="success",
+        status=overall_status,
         execution_time_ms=execution_time_ms,
     )
     db.add(log)
     await db.commit()
 
-    logger.info(f"Orchestration complete: log_id={log.id}, execution_time_ms={execution_time_ms}")
+    logger.info(f"Orchestration complete: log_id={log.id}, status={overall_status}, execution_time_ms={execution_time_ms}")
 
     return OrchestrateResponse(
         orchestration_id=log.id,
         student_id=student.id,
         trigger_description=body.trigger_description,
         topic=body.topic,
-        status="success",
+        status=overall_status,
         execution_time_ms=execution_time_ms,
+        agent_statuses=agent_statuses,
         student_insight=student_insight,
         teacher_action=teacher_action,
         parent_communication=parent_communication,

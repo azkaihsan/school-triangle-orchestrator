@@ -516,6 +516,20 @@ components:
           type: ["string", "null"]
       required: [student_id, trigger_description]
 
+    AgentStatus:
+      type: object
+      properties:
+        agent:
+          type: string
+          description: Sub-agent name (student_insight, teacher_action, parent_communication, scheduling)
+        status:
+          type: string
+          enum: [success, failed]
+        error:
+          type: ["string", "null"]
+          description: Error message if the agent failed
+      required: [agent, status]
+
     OrchestrateResponse:
       type: object
       properties:
@@ -529,8 +543,15 @@ components:
           type: ["string", "null"]
         status:
           type: string
+          enum: [success, partial, failed]
+          description: Overall pipeline status (success = all agents ok, partial = some failed, failed = all failed)
         execution_time_ms:
           type: integer
+        agent_statuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentStatus"
+          description: Per-sub-agent execution status and error details
         student_insight:
           type: object
         teacher_action:
@@ -541,7 +562,7 @@ components:
           type: object
         summary:
           type: string
-      required: [orchestration_id, student_id, trigger_description, status, execution_time_ms, student_insight, teacher_action, parent_communication, scheduling, summary]
+      required: [orchestration_id, student_id, trigger_description, status, execution_time_ms, agent_statuses, student_insight, teacher_action, parent_communication, scheduling, summary]
 
     StudentInsightResponse:
       type: object
