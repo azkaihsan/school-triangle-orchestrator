@@ -2,14 +2,24 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: |
+    School Triangle Orchestrator API — Multi-agent AI system connecting students, teachers, and parents.
+    Powered by Gemini AI. The Primary Orchestrator Agent coordinates four specialized sub-agents
+    (Student Insight, Teacher Action, Parent Communication, Scheduling) and returns a unified response.
+    Built with Python + FastAPI.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: students
+    description: Student profile management
+  - name: orchestrator
+    description: Primary Orchestrator Agent — coordinates all four sub-agents
+  - name: scheduling
+    description: Scheduling Agent with simulated MCP tool calls
 paths:
   /healthz:
     get:
@@ -24,6 +34,240 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      summary: List all students
+      responses:
+        "200":
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudentListItem"
+    post:
+      operationId: createStudent
+      tags: [students]
+      summary: Create a new student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentCreate"
+      responses:
+        "201":
+          description: Student created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /students/{studentId}:
+    get:
+      operationId: getStudent
+      tags: [students]
+      summary: Get a student by ID (includes teacher and parent)
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateStudent
+      tags: [students]
+      summary: Update student fields
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentUpdate"
+      responses:
+        "200":
+          description: Student updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+    delete:
+      operationId: deleteStudent
+      tags: [students]
+      summary: Delete a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /students/{studentId}/insights:
+    get:
+      operationId: getStudentInsights
+      tags: [students]
+      summary: Student Insight Agent — analyze misconceptions and mastery gaps (AI)
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: topic
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Student insight analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentInsightResponse"
+
+  /students/{studentId}/interventions:
+    get:
+      operationId: getStudentInterventions
+      tags: [students]
+      summary: Teacher Action Agent — generate intervention plans and assignments (AI)
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: topic
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Teacher action plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherActionResponse"
+
+  /students/{studentId}/parent-summary:
+    get:
+      operationId: getParentSummary
+      tags: [students]
+      summary: Parent Communication Agent — generate parent summary and home suggestions (AI)
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: topic
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Parent summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParentSummaryResponse"
+
+  /orchestrate:
+    post:
+      operationId: orchestrate
+      tags: [orchestrator]
+      summary: Primary Orchestrator — runs all four AI sub-agents and returns unified response
+      description: |
+        Triggers the full multi-agent pipeline:
+        1. Student Insight Agent (misconceptions & mastery gaps)
+        2. Teacher Action Agent (intervention plan & assignments)
+        3. Parent Communication Agent (parent summary & home suggestions)
+        4. Scheduling Agent (calendar events, tasks, reminders via MCP)
+        Results are persisted to orchestration_logs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrchestrateRequest"
+      responses:
+        "201":
+          description: Orchestration complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrchestrateResponse"
+
+  /orchestrate/logs:
+    get:
+      operationId: getOrchestrationLogs
+      tags: [orchestrator]
+      summary: Get orchestration audit logs
+      parameters:
+        - name: student_id
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: List of orchestration logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrchestrationLog"
+
+  /schedule:
+    post:
+      operationId: createSchedule
+      tags: [scheduling]
+      summary: Scheduling Agent — create calendar events, tasks, and reminders via simulated MCP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleRequest"
+      responses:
+        "200":
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +278,362 @@ components:
       required:
         - status
 
+    Teacher:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        subject_area:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [id, name, email, subject_area, created_at]
+
+    Parent:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        created_at:
+          type: string
+          format: date-time
+      required: [id, name, email, created_at]
+
+    StudentCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        grade_level:
+          type: integer
+        teacher_id:
+          type: ["integer", "null"]
+        parent_id:
+          type: ["integer", "null"]
+        learning_style:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+      required: [name, grade_level]
+
+    StudentUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        grade_level:
+          type: ["integer", "null"]
+        teacher_id:
+          type: ["integer", "null"]
+        parent_id:
+          type: ["integer", "null"]
+        learning_style:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    StudentListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        grade_level:
+          type: integer
+        learning_style:
+          type: ["string", "null"]
+        teacher_id:
+          type: ["integer", "null"]
+        parent_id:
+          type: ["integer", "null"]
+        created_at:
+          type: string
+          format: date-time
+      required: [id, name, grade_level, created_at]
+
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        grade_level:
+          type: integer
+        teacher_id:
+          type: ["integer", "null"]
+        parent_id:
+          type: ["integer", "null"]
+        learning_style:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        teacher:
+          oneOf:
+            - $ref: "#/components/schemas/Teacher"
+            - type: "null"
+        parent:
+          oneOf:
+            - $ref: "#/components/schemas/Parent"
+            - type: "null"
+      required: [id, name, grade_level, created_at, updated_at]
+
+    Intervention:
+      type: object
+      properties:
+        id:
+          type: integer
+        student_id:
+          type: integer
+        topic_id:
+          type: ["integer", "null"]
+        type:
+          type: string
+          enum: [remediation, enrichment, review, assessment]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, active, completed, cancelled]
+        ai_analysis:
+          type: ["object", "null"]
+        created_at:
+          type: string
+          format: date-time
+      required: [id, student_id, type, title, status, created_at]
+
+    Assignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        student_id:
+          type: integer
+        topic_id:
+          type: ["integer", "null"]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        due_date:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [assigned, in_progress, completed, overdue]
+        created_by_agent:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+      required: [id, student_id, title, status, created_by_agent, created_at]
+
+    ParentNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        student_id:
+          type: integer
+        parent_id:
+          type: ["integer", "null"]
+        message:
+          type: string
+        type:
+          type: string
+          enum: [progress_update, concern_alert, achievement, meeting_request]
+        channel:
+          type: string
+          enum: [email, sms, app]
+        status:
+          type: string
+          enum: [pending, sent, read]
+        ai_content:
+          type: ["object", "null"]
+        created_at:
+          type: string
+          format: date-time
+      required: [id, student_id, message, type, channel, status, created_at]
+
+    OrchestrationLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        student_id:
+          type: integer
+        trigger_description:
+          type: string
+        topic:
+          type: ["string", "null"]
+        student_insight_result:
+          type: ["object", "null"]
+        teacher_action_result:
+          type: ["object", "null"]
+        parent_communication_result:
+          type: ["object", "null"]
+        scheduling_result:
+          type: ["object", "null"]
+        unified_response:
+          type: ["object", "null"]
+        status:
+          type: string
+          enum: [success, partial, failed]
+        execution_time_ms:
+          type: ["integer", "null"]
+        created_at:
+          type: string
+          format: date-time
+      required: [id, student_id, trigger_description, status, created_at]
+
+    OrchestrateRequest:
+      type: object
+      properties:
+        student_id:
+          type: integer
+        trigger_description:
+          type: string
+        topic:
+          type: ["string", "null"]
+      required: [student_id, trigger_description]
+
+    OrchestrateResponse:
+      type: object
+      properties:
+        orchestration_id:
+          type: integer
+        student_id:
+          type: integer
+        trigger_description:
+          type: string
+        topic:
+          type: ["string", "null"]
+        status:
+          type: string
+        execution_time_ms:
+          type: integer
+        student_insight:
+          type: object
+        teacher_action:
+          type: object
+        parent_communication:
+          type: object
+        scheduling:
+          type: object
+        summary:
+          type: string
+      required: [orchestration_id, student_id, trigger_description, status, execution_time_ms, student_insight, teacher_action, parent_communication, scheduling, summary]
+
+    StudentInsightResponse:
+      type: object
+      properties:
+        student_id:
+          type: integer
+        student_name:
+          type: string
+        analysis:
+          type: object
+        interventions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Intervention"
+      required: [student_id, student_name, analysis, interventions]
+
+    TeacherActionResponse:
+      type: object
+      properties:
+        student_id:
+          type: integer
+        student_name:
+          type: string
+        action_plan:
+          type: object
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Assignment"
+        interventions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Intervention"
+      required: [student_id, student_name, action_plan, assignments, interventions]
+
+    ParentSummaryResponse:
+      type: object
+      properties:
+        student_id:
+          type: integer
+        student_name:
+          type: string
+        parent_name:
+          type: ["string", "null"]
+        summary:
+          type: object
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParentNotification"
+      required: [student_id, student_name, summary, notifications]
+
+    ScheduleRequest:
+      type: object
+      properties:
+        student_id:
+          type: integer
+        event_type:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        scheduled_date:
+          type: ["string", "null"]
+        participants:
+          type: array
+          items:
+            type: string
+      required: [student_id, event_type, title]
+
+    ScheduleResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        mcp_tool_calls:
+          type: array
+          items:
+            type: object
+        calendar_events:
+          type: array
+          items:
+            type: object
+        tasks_created:
+          type: array
+          items:
+            type: object
+        reminders_set:
+          type: array
+          items:
+            type: object
+        summary:
+          type: string
+      required: [status, mcp_tool_calls, calendar_events, tasks_created, reminders_set, summary]
